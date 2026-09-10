@@ -1,0 +1,22 @@
+# Heroku container build manifest. Must live at the repo root.
+# https://devcenter.heroku.com/articles/build-docker-images-heroku-yml
+#
+# The backend is a Go service under backend/. Heroku uses the directory that
+# contains the referenced Dockerfile as the Docker build context, so the
+# COPY paths inside backend/Dockerfile resolve against backend/.
+
+build:
+  docker:
+    web: backend/Dockerfile
+    release:
+      dockerfile: backend/Dockerfile
+      target: migrate
+
+release:
+  # The migrate stage's ENTRYPOINT is /app/migrate. It reads no arguments,
+  # applies every embedded migration, and exits; re-running with no pending
+  # migrations is a no-op. Heroku requires a command here, so the entrypoint
+  # is repeated as the (ignored) argument.
+  image: release
+  command:
+    - /app/migrate
