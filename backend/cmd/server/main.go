@@ -58,6 +58,14 @@ func main() {
 		log.Error("Failed to parse Redis URL", "error", err)
 		os.Exit(1)
 	}
+	// Managed Redis providers such as Heroku Key-Value Store require TLS but
+	// serve a self-signed certificate. ParseURL turns on verification for
+	// rediss:// URLs, which then fails the handshake; skip verification while
+	// keeping the connection encrypted. Plain redis:// URLs leave TLSConfig
+	// nil and are unaffected.
+	if opt.TLSConfig != nil {
+		opt.TLSConfig.InsecureSkipVerify = true
+	}
 	redisClient := redis.NewClient(opt)
 
 	// 4. Initialize External Clients
