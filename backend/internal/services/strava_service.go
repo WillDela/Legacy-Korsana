@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -637,7 +638,7 @@ func (s *StravaService) SyncActivities(ctx context.Context, userID uuid.UUID) (*
 
 		var sufferScore *int
 		if act.SufferScore > 0 {
-			ss := act.SufferScore
+			ss := int(math.Round(act.SufferScore))
 			sufferScore = &ss
 		}
 
