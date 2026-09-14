@@ -39,9 +39,9 @@ func (e *APIError) Error() string {
 		return ""
 	}
 	if e.RetryAfter > 0 {
-		return fmt.Sprintf("strava api returned status %d (retry after %s)", e.StatusCode, e.RetryAfter)
+		return fmt.Sprintf("strava api returned status %d (retry after %s): %s", e.StatusCode, e.RetryAfter, e.Body)
 	}
-	return fmt.Sprintf("strava api returned status: %d", e.StatusCode)
+	return fmt.Sprintf("strava api returned status: %d: %s", e.StatusCode, e.Body)
 }
 
 func parseRetryAfter(header string) time.Duration {
