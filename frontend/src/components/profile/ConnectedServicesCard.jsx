@@ -41,16 +41,14 @@ const DisconnectModal = ({ onConfirm, onCancel, loading }) => (
 const ConnectedServicesCard = ({
   stravaConnected,
   stravaAthleteId,
-  stravaMessage,
+  syncing,
+  syncMessage,
+  onSync,
   integrationInterest = [],
   onConnectStrava,
   onDisconnect,
-  onUpdate,
   onRequestIntegrationInterest,
 }) => {
-  const [syncing, setSyncing] = useState(false);
-  const [syncMessage, setSyncMessage] = useState('');
-  const [syncError, setSyncError] = useState('');
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [disconnectError, setDisconnectError] = useState('');
@@ -61,25 +59,6 @@ const ConnectedServicesCard = ({
     () => Object.fromEntries((integrationInterest || []).map((item) => [item.source, item])),
     [integrationInterest],
   );
-
-  const handleSync = async () => {
-    try {
-      setSyncing(true);
-      setSyncMessage('');
-      setSyncError('');
-      const res = await stravaAPI.syncActivities();
-      setSyncMessage(res?.message || `Synced ${res.count} activities.`);
-      if (onUpdate) await onUpdate();
-    } catch (err) {
-      setSyncError(getErrorMessage(err));
-    } finally {
-      setSyncing(false);
-      setTimeout(() => {
-        setSyncMessage('');
-        setSyncError('');
-      }, 5000);
-    }
-  };
 
   const handleDisconnect = async () => {
     try {
@@ -134,29 +113,18 @@ const ConnectedServicesCard = ({
         </div>
 
         <AnimatePresence>
-          {stravaMessage?.text && (
-            <motion.div
-              key="strava-msg"
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className={`rounded-lg px-4 py-3 mb-4 text-sm font-medium text-white ${stravaMessage.type === 'success' ? 'bg-success' : 'bg-error'}`}
-            >
-              {stravaMessage.text}
-            </motion.div>
-          )}
-          {syncMessage && (
+          {syncMessage?.text && (
             <motion.div
               key="sync-msg"
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="rounded-lg px-4 py-3 mb-4 text-sm font-medium text-navy bg-sage/10 border border-sage/30"
+              className={`rounded-lg px-4 py-3 mb-4 text-sm font-medium text-white ${syncMessage.type === 'success' ? 'bg-success' : 'bg-error'}`}
             >
-              {syncMessage}
+              {syncMessage.text}
             </motion.div>
           )}
-          {(syncError || disconnectError) && (
+          {disconnectError && (
             <motion.div
               key="error-msg"
               initial={{ opacity: 0, y: -6 }}
@@ -164,7 +132,7 @@ const ConnectedServicesCard = ({
               exit={{ opacity: 0 }}
               className="rounded-lg px-4 py-3 mb-4 text-sm font-medium text-white bg-error"
             >
-              {syncError || disconnectError}
+              {disconnectError}
             </motion.div>
           )}
         </AnimatePresence>
@@ -189,7 +157,7 @@ const ConnectedServicesCard = ({
             </p>
 
             <div className="flex items-center gap-3 flex-wrap">
-              <button onClick={handleSync} disabled={syncing} className="btn btn-sm btn-outline font-semibold flex items-center gap-2">
+              <button onClick={onSync} disabled={syncing} className="btn btn-sm btn-outline font-semibold flex items-center gap-2">
                 <LuRefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
                 {syncing ? 'Syncing…' : 'Sync Now'}
               </button>

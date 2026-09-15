@@ -40,7 +40,12 @@ export default function AppPageHero({
             {secondaryAction && (
               <button
                 onClick={secondaryAction.onClick}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-navy border border-[var(--color-border)] bg-white hover:bg-[var(--color-bg-elevated)] active:scale-[0.98] transition-all cursor-pointer"
+                disabled={secondaryAction.disabled}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-navy border border-[var(--color-border)] bg-white hover:bg-[var(--color-bg-elevated)] active:scale-[0.98] transition-all"
+                style={{
+                  cursor: secondaryAction.disabled ? 'not-allowed' : 'pointer',
+                  opacity: secondaryAction.disabled ? 0.65 : 1,
+                }}
               >
                 {secondaryAction.label}
               </button>
@@ -48,7 +53,12 @@ export default function AppPageHero({
             {primaryAction && (
               <button
                 onClick={primaryAction.onClick}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold text-white bg-coral hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer border-none shadow-sm"
+                disabled={primaryAction.disabled}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold text-white bg-coral hover:brightness-110 active:scale-[0.98] transition-all border-none shadow-sm"
+                style={{
+                  cursor: primaryAction.disabled ? 'not-allowed' : 'pointer',
+                  opacity: primaryAction.disabled ? 0.65 : 1,
+                }}
               >
                 {primaryAction.label}
               </button>

@@ -5,6 +5,7 @@ import { userProfileAPI } from '../api/userProfile';
 import { stravaAPI } from '../api/strava';
 import { getErrorMessage } from '../api/client';
 import { getStravaRedirectState, clearStravaRedirectParams } from '../lib/stravaRedirect';
+import { useStravaSync } from '../hooks/useStravaSync';
 
 import ProfileBanner from '../components/profile/ProfileBanner';
 import PersonalRecords from '../components/profile/PersonalRecords';
@@ -27,7 +28,9 @@ const Settings = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('identity'); // 'identity' | 'performance' | 'integrations' | 'notifications' | 'account'
   const [generalError, setGeneralError] = useState('');
-  const [stravaMessage, setStravaMessage] = useState({ type: '', text: '' });
+
+  const { syncing: stravaSyncing, syncMessage: stravaMessage, sync: syncStrava, showMessage: showStravaMessage } =
+    useStravaSync({ onSuccess: () => fetchProfile() });
 
   useEffect(() => {
     fetchProfile();
@@ -39,17 +42,15 @@ const Settings = () => {
     if (!redirectState) return;
 
     setActiveTab('integrations');
-    setStravaMessage(
-      redirectState.type === 'success'
-        ? { type: 'success', text: 'Strava connected successfully. You can sync from here anytime.' }
-        : redirectState
-    );
+    clearStravaRedirectParams(setSearchParams);
 
     if (redirectState.type === 'success') {
-      fetchProfile();
+      showStravaMessage('Strava connected. Pulling in your latest activities...', 'success', 5000);
+      syncStrava({ afterConnect: true });
+      return;
     }
 
-    clearStravaRedirectParams(setSearchParams);
+    showStravaMessage(redirectState.text, 'error', 5000);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, setSearchParams]);
 
@@ -173,18 +174,19 @@ const Settings = () => {
             <ConnectedServicesCard
               stravaConnected={profileData?.strava?.connected}
               stravaAthleteId={profileData?.strava?.athlete_id}
-              stravaMessage={stravaMessage}
+              syncing={stravaSyncing}
+              syncMessage={stravaMessage}
+              onSync={() => syncStrava()}
               integrationInterest={profileData?.integration_interest}
               onConnectStrava={async () => {
                 try {
                   const response = await stravaAPI.getAuthURL();
                   window.location.href = response.url;
                 } catch (error) {
-                  setStravaMessage({ type: 'error', text: getErrorMessage(error) });
+                  showStravaMessage(getErrorMessage(error), 'error', 5000);
                 }
               }}
               onDisconnect={handleProfileUpdate}
-              onUpdate={handleProfileUpdate}
               onRequestIntegrationInterest={handleIntegrationInterest}
             />
           </motion.div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
+import { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import {
   LuChartColumnBig as LuBarChart2, LuTarget, LuActivity, LuHeart, LuZap, LuHeartPulse,
   LuMountain, LuFootprints, LuFlame, LuDumbbell, LuCircleCheckBig as LuCheckCircle2,
@@ -20,7 +20,6 @@ import { userProfileAPI } from '../api/userProfile';
 import { getErrorMessage } from '../api/client';
 import ErrorBoundary from '../components/ErrorBoundary';
 import SessionDetailsModal from '../components/SessionDetailsModal';
-import BrandIcon from '../components/BrandIcon';
 import { dashboardAPI } from '../api/dashboard';
 import TrainingLoadWidget from '../components/dashboard/widgets/TrainingLoadWidget';
 import RacePredictorWidget from '../components/dashboard/widgets/RacePredictorWidget';
@@ -41,11 +40,8 @@ import MetricStrip from '../components/ui/MetricStrip';
 import BriefingPanel from '../components/ui/BriefingPanel';
 import { coachAPI } from '../api/coach';
 import { chartTheme } from '../lib/chartTheme';
-import {
-  getStravaRedirectState,
-  clearStravaRedirectParams,
-  formatStravaSyncMessage,
-} from '../lib/stravaRedirect';
+import { getStravaRedirectState, clearStravaRedirectParams } from '../lib/stravaRedirect';
+import { useStravaSync } from '../hooks/useStravaSync';
 
 // ─── Workout type colors ───────────────────────────────────────
 const WC = {
@@ -233,113 +229,6 @@ const Gauge = ({ score }) => {
         <span className="font-mono text-[28px] font-bold text-navy leading-none">{score}</span>
         <span className="font-sans text-[10px] text-[var(--color-text-muted)]">/ 100</span>
       </div>
-    </div>
-  );
-};
-
-// ─── SyncDropdown ─────────────────────────────────────────────
-const BASE_SOURCES = [
-  { id: 'strava', label: 'Strava', status: 'connected', color: '#FC4C02' },
-  { id: 'garmin', label: 'Garmin', status: 'coming',    color: '#007DC5' },
-  { id: 'coros',  label: 'Coros',  status: 'coming',    color: '#1B2559' },
-];
-
-const SyncDropdown = ({ isSyncing, onSync, onConnect, stravaConnected, requestedSources = {} }) => {
-  const [open, setOpen] = useState(false);
-  const sources = BASE_SOURCES.map((source) => (
-    source.id === 'strava'
-      ? source
-      : { ...source, requested: Boolean(requestedSources[source.id]) }
-  ));
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-[6px] border border-[#D4D8E8] rounded-lg px-3 py-[5px] font-sans text-[11px] font-bold text-navy cursor-pointer transition-all"
-        style={{ background: open ? '#ECEEF4' : '#F8F9FC' }}
-      >
-        <svg
-          width="13" height="13" viewBox="0 0 24 24" fill="none"
-          stroke={isSyncing ? '#E8634A' : '#1B2559'} strokeWidth="2.5"
-          strokeLinecap="round" strokeLinejoin="round"
-          style={{ animation: isSyncing ? 'krs-spin 0.8s linear infinite' : 'none' }}
-        >
-          <polyline points="1 4 1 10 7 10" />
-          <path d="M3.51 15a9 9 0 1 0 .49-4.5" />
-        </svg>
-        {isSyncing ? 'Syncing…' : 'Sync'}
-        <span
-          className="text-[11px] text-[var(--color-text-muted)] inline-block transition-transform duration-200"
-          style={{ transform: open ? 'rotate(180deg)' : 'none' }}
-        >▾</span>
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-[299]" onClick={() => setOpen(false)} />
-          <div className="absolute top-[calc(100%+8px)] right-0 bg-white rounded-[14px] w-[220px] border border-[var(--color-border-light)] p-3 z-[300] shadow-[0_4px_32px_rgba(27,37,89,0.16)]">
-            <div className="font-sans text-[10px] font-bold text-[var(--color-text-muted)] uppercase tracking-[0.1em] mb-[10px]">
-              Data Sources
-            </div>
-            {sources.map(s => (
-              <div
-                key={s.id}
-                className="flex items-center gap-[10px] px-[10px] py-[9px] rounded-[9px] mb-1"
-                style={{
-                  background: s.status === 'connected' ? '#F8F9FC' : 'transparent',
-                  border: `1px solid ${s.status === 'connected' ? '#ECEEF4' : 'transparent'}`,
-                  cursor: s.status === 'coming' ? 'pointer' : 'default',
-                }}
-                onClick={s.status === 'coming' ? () => { onSync(s.id); setOpen(false); } : undefined}
-              >
-                <div className="w-[30px] h-[30px] rounded-[7px] bg-white border border-[#D4D8E8] flex items-center justify-center shrink-0 overflow-hidden">
-                  <BrandIcon brand={s.id} size={18} />
-                </div>
-                <div className="flex-1">
-                  <div
-                    className="font-sans text-[12px] font-semibold"
-                    style={{ color: s.status === 'connected' ? '#1B2559' : '#8B93B0' }}
-                  >
-                    {s.label}
-                  </div>
-                  <div
-                    className="font-sans text-[10px] mt-[1px]"
-                    style={{
-                      color: s.status === 'connected'
-                        ? (stravaConnected === false ? '#E8634A' : '#2ECC8B')
-                        : '#8B93B0',
-                    }}
-                  >
-                    {s.status === 'connected'
-                      ? (stravaConnected === false ? '○ Not connected' : '● Connected')
-                      : (s.requested ? 'Requested beta access' : 'Request beta access')}
-                  </div>
-                </div>
-                {s.status === 'connected' && (
-                  stravaConnected === false ? (
-                    <button
-                      onClick={() => { onConnect(); setOpen(false); }}
-                      className="bg-coral border-0 rounded-[7px] px-[10px] py-[5px] font-sans text-[11px] font-bold text-white cursor-pointer whitespace-nowrap"
-                    >Connect</button>
-                  ) : (
-                    <button
-                      onClick={() => { onSync('strava'); setOpen(false); }}
-                      className="bg-navy border-0 rounded-[7px] px-[10px] py-[5px] font-sans text-[11px] font-bold text-white cursor-pointer"
-                    >Sync</button>
-                  )
-                )}
-                {s.status === 'coming' && (
-                  <button
-                    onClick={() => { onSync(s.id); setOpen(false); }}
-                    className={`border-0 rounded-[7px] px-[10px] py-[5px] font-sans text-[11px] font-bold whitespace-nowrap ${s.requested ? 'bg-[#E9FBF3] text-[#1A7A50]' : 'bg-[#ECEEF4] text-[#1B2559] cursor-pointer'}`}
-                  >
-                    {s.requested ? 'Requested' : 'Notify me'}
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
     </div>
   );
 };
@@ -554,7 +443,6 @@ const WidgetGrid = memo(({ active, dashboardData, computedData, onRefresh, strav
 const Dashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { unit } = useUnits();
-  const syncMessageTimerRef = useRef(null);
 
   // Unit-aware helpers (defined here so they close over `unit`)
   const MPU = unit === 'imperial' ? 1609.34 : 1000;            // meters per unit
@@ -565,9 +453,6 @@ const Dashboard = () => {
   const [activeGoal, setActiveGoal] = useState(null);
   const [activities, setActivities] = useState([]);
   const [weekEntries, setWeekEntries] = useState([]);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncMsg, setSyncMsg] = useState({ text: '', type: '' });
-  const [lastSynced, setLastSynced] = useState(null);
   const [stravaConnected, setStravaConnected] = useState(null);
   const [insight, setInsight] = useState(null);
   const [requestedIntegrations, setRequestedIntegrations] = useState({});
@@ -589,21 +474,6 @@ const Dashboard = () => {
 
   const [dashboardData, setDashboardData] = useState(null);
 
-  const showSyncMessage = useCallback((text, type = 'success', timeoutMs = 4000) => {
-    if (syncMessageTimerRef.current) {
-      clearTimeout(syncMessageTimerRef.current);
-    }
-
-    setSyncMsg({ text, type });
-
-    if (timeoutMs > 0) {
-      syncMessageTimerRef.current = window.setTimeout(() => {
-        setSyncMsg({ text: '', type: '' });
-        syncMessageTimerRef.current = null;
-      }, timeoutMs);
-    }
-  }, []);
-
   const fetchActiveGoal = useCallback(async () => {
     try {
       const res = await goalsAPI.getActiveGoal();
@@ -614,27 +484,13 @@ const Dashboard = () => {
   const fetchActivities = useCallback(async () => {
     try {
       const res = await activitiesAPI.getActivities();
-      setActivities(res.activities || []);
-    } catch { setActivities([]); }
-  }, []);
-
-  const fetchActivitiesAndAutoSync = useCallback(async () => {
-    try {
-      const res = await activitiesAPI.getActivities();
-      if (!res.activities?.length) {
-        try {
-          await stravaAPI.syncActivities();
-          const synced = await activitiesAPI.getActivities();
-          setActivities(synced.activities || []);
-          setLastSynced(new Date().toISOString());
-        } catch (err) {
-          if (err?.response?.status === 404) setStravaConnected(false);
-          setActivities([]);
-        }
-      } else {
-        setActivities(res.activities);
-      }
-    } catch { setActivities([]); }
+      const acts = res.activities || [];
+      setActivities(acts);
+      return acts;
+    } catch {
+      setActivities([]);
+      return [];
+    }
   }, []);
 
   const fetchDashboardData = useCallback(async () => {
@@ -697,6 +553,15 @@ const Dashboard = () => {
   }, [fetchWeekEntries]);
 
 
+  const { syncing: isSyncing, syncMessage: syncMsg, sync: syncStravaActivities, showMessage: showSyncMessage } =
+    useStravaSync({
+      onSuccess: async () => {
+        setStravaConnected(true);
+        await Promise.all([fetchActivities(), fetchDashboardData()]);
+      },
+      onNotConnected: () => setStravaConnected(false),
+    });
+
   const handleConnectStrava = useCallback(async () => {
     try {
       const data = await stravaAPI.getAuthURL('/dashboard');
@@ -705,28 +570,6 @@ const Dashboard = () => {
       showSyncMessage('Could not start Strava connect. Try again from Settings.', 'error', 4000);
     }
   }, [showSyncMessage]);
-
-  const syncStravaActivities = useCallback(async ({ afterConnect = false } = {}) => {
-    try {
-      setIsSyncing(true);
-      const result = await stravaAPI.syncActivities();
-      setLastSynced(new Date().toISOString());
-      setStravaConnected(true);
-      showSyncMessage(formatStravaSyncMessage(result, { afterConnect }), 'success', 4500);
-      fetchActivities();
-      fetchDashboardData();
-    } catch (error) {
-      const status = error?.response?.status;
-      if (status === 401 || status === 404) {
-        setStravaConnected(false);
-        showSyncMessage('Strava is not connected yet. Finish setup in Settings.', 'error', 5000);
-      } else {
-        showSyncMessage(getErrorMessage(error), 'error', 5000);
-      }
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [fetchActivities, fetchDashboardData, showSyncMessage]);
 
   const handleSyncActivities = useCallback(async (provider = 'strava') => {
     if (provider !== 'strava') {
@@ -761,17 +604,14 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchActiveGoal();
-    fetchActivitiesAndAutoSync();
+    (async () => {
+      const acts = await fetchActivities();
+      if (!acts.length) syncStravaActivities();
+    })();
     fetchWeekEntries();
     fetchDashboardData();
     fetchInsight();
     fetchIntegrationInterest();
-  }, []);
-
-  useEffect(() => () => {
-    if (syncMessageTimerRef.current) {
-      clearTimeout(syncMessageTimerRef.current);
-    }
   }, []);
 
   const today = new Date();
@@ -1240,6 +1080,7 @@ const Dashboard = () => {
         primaryAction={{
           label: isSyncing ? 'Syncing…' : (stravaConnected === false ? 'Connect Strava' : 'Sync Strava'),
           onClick: stravaConnected === false ? handleConnectStrava : handleSyncActivities,
+          disabled: isSyncing,
         }}
       >
         <div className="flex items-center gap-3 flex-wrap mt-1">
