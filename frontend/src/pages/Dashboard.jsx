@@ -1,10 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { LuCheck } from 'react-icons/lu';
 import { useSearchParams } from 'react-router-dom';
-import {
-  BarChart, Bar, LineChart, Line,
-  XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
-} from 'recharts';
 import { goalsAPI } from '../api/goals';
 import { useUnits } from '../context/UnitsContext';
 import { formatPace, distanceLabel } from '../utils/units';
@@ -19,21 +14,19 @@ import AppPageHero from '../components/ui/AppPageHero';
 import MetricStrip from '../components/ui/MetricStrip';
 import BriefingPanel from '../components/ui/BriefingPanel';
 import { coachAPI } from '../api/coach';
-import { chartTheme } from '../lib/chartTheme';
 import { getStravaRedirectState, clearStravaRedirectParams } from '../lib/stravaRedirect';
 import { useStravaSync } from '../hooks/useStravaSync';
-import { PHASE_VARIANT, DAY_LABELS, RUN_TABLE_COLS, RUN_TABLE_HEADERS } from '../lib/dashboardConstants';
-import { fmtDateISO, fmtTime, getTrainingPhase } from '../lib/dashboardHelpers';
-import Pill from '../components/dashboard/atoms/Pill';
-import Card from '../components/dashboard/atoms/Card';
-import SLabel from '../components/dashboard/atoms/SLabel';
-import Tip from '../components/dashboard/atoms/Tip';
+import { PHASE_VARIANT, DAY_LABELS } from '../lib/dashboardConstants';
+import { fmtDateISO, getTrainingPhase } from '../lib/dashboardHelpers';
 import WidgetSelector from '../components/dashboard/WidgetSelector';
 import WidgetGrid from '../components/dashboard/WidgetGrid';
 import WeekCalendarStrip from '../components/dashboard/sections/WeekCalendarStrip';
 import TodayWorkoutCard from '../components/dashboard/sections/TodayWorkoutCard';
 import RaceReadinessCard from '../components/dashboard/sections/RaceReadinessCard';
 import UpNextCard from '../components/dashboard/sections/UpNextCard';
+import MetricCardsRow from '../components/dashboard/sections/MetricCardsRow';
+import TrainingTrendsCharts from '../components/dashboard/sections/TrainingTrendsCharts';
+import RecentRunsTable from '../components/dashboard/sections/RecentRunsTable';
 
 // ─── Dashboard ────────────────────────────────────────────────
 const Dashboard = () => {
@@ -705,255 +698,23 @@ const Dashboard = () => {
               <UpNextCard entries={upNextEntries} unitLabel={unitLabel} />
 
               {/* ③ METRIC CARDS */}
-              <div>
-                <SLabel>This Week</SLabel>
-                <div className="grid grid-cols-3 gap-5">
-                  {/* Weekly Mileage */}
-                  <Card>
-                    <div className="font-sans text-[10px] font-bold text-[var(--color-text-muted)] uppercase tracking-[0.1em] mb-[14px]">
-                      Weekly Mileage
-                    </div>
-                    <div className="flex items-baseline gap-[6px] mb-1">
-                      <span className="font-mono text-[42px] font-bold text-navy leading-none">{weeklyMileage}</span>
-                      <span className="font-sans text-[14px] text-[var(--color-text-muted)] font-semibold">{unitLabel}</span>
-                    </div>
-                    <div className="font-sans text-[12px] text-[var(--color-text-muted)] mb-4">
-                      of {weeklyTarget} {unitLabel} planned
-                    </div>
-                    <div className="h-[6px] bg-[var(--color-border-light)] rounded-full overflow-hidden mb-3">
-                      <div
-                        className="h-full bg-navy rounded-full"
-                        style={{ width: `${Math.min(100, (weeklyMileage / weeklyTarget) * 100)}%` }}
-                      />
-                    </div>
-                    {weeklyMilageDelta !== 0 && (
-                      <span
-                        className="font-sans text-[12px] font-semibold"
-                        style={{ color: weeklyMilageDelta > 0 ? '#2ECC8B' : '#F5A623' }}
-                      >
-                        {weeklyMilageDelta > 0 ? '▲' : '▼'} {Math.abs(weeklyMilageDelta)} {unitLabel} vs last week
-                      </span>
-                    )}
-                  </Card>
-
-                  {/* Aerobic Efficiency */}
-                  <Card>
-                    <div className="font-sans text-[10px] font-bold text-[var(--color-text-muted)] uppercase tracking-[0.1em] mb-[14px]">
-                      Aerobic Efficiency
-                    </div>
-                    {aerobicEffImprovement !== null ? (
-                      <>
-                        <div className="flex items-baseline gap-2 mb-1">
-                          <span
-                            className="font-mono text-[42px] font-bold leading-none"
-                            style={{ color: aerobicEffImprovement >= 0 ? '#1B2559' : '#F5A623' }}
-                          >
-                            {aerobicEffImprovement > 0 ? '+' : ''}{aerobicEffImprovement}
-                            <span className="text-[22px]">%</span>
-                          </span>
-                        </div>
-                        <div className="font-sans text-[12px] text-[var(--color-text-muted)] mb-[14px]">
-                          faster at same HR vs 8 weeks ago
-                        </div>
-                        <ResponsiveContainer width="100%" height={36} style={{ marginBottom: 12 }}>
-                          <LineChart data={aerobicEffData.filter(w => w.eff !== null)}>
-                            <YAxis domain={['dataMin - 0.001', 'dataMax + 0.001']} hide />
-                            <Line
-                              type="monotone" dataKey="eff"
-                              stroke={aerobicEffImprovement >= 0 ? '#2ECC8B' : '#F5A623'}
-                              strokeWidth={2.5} dot={false}
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
-                        <span
-                          className="font-sans text-[12px] font-semibold"
-                          style={{ color: aerobicEffImprovement >= 0 ? '#2ECC8B' : '#F5A623' }}
-                        >
-                          {aerobicEffImprovement >= 0 ? '▲ Aerobic engine improving' : '▼ Monitor training stress'}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <div className="font-mono text-[42px] font-bold text-[#D4D8E8] leading-none mb-[10px]">—</div>
-                        <div className="font-sans text-[12px] text-[var(--color-text-muted)]">
-                          Sync HR data to track aerobic efficiency
-                        </div>
-                      </>
-                    )}
-                  </Card>
-
-                  {/* Training Load */}
-                  <Card>
-                    <div className="font-sans text-[10px] font-bold text-[var(--color-text-muted)] uppercase tracking-[0.1em] mb-[14px]">
-                      Training Load
-                    </div>
-                    <div className="flex items-baseline gap-[10px] mb-1">
-                      <span className="font-mono text-[42px] font-bold text-navy leading-none">{trainingLoadScore}</span>
-                      <span
-                        className="font-sans text-[16px] font-bold"
-                        style={{ color: trainingLoadScore >= 85 ? '#E8634A' : trainingLoadScore >= 60 ? '#F5A623' : '#2ECC8B' }}
-                      >{trainingLoadLabel}</span>
-                    </div>
-                    <div className="font-sans text-[12px] text-[var(--color-text-muted)] mb-4">
-                      Volume vs target · {weeklyRunCount} run{weeklyRunCount !== 1 ? 's' : ''} this week
-                    </div>
-                    <div className="h-[6px] bg-[var(--color-border-light)] rounded-full overflow-hidden mb-3">
-                      <div
-                        className="h-full rounded-full"
-                        style={{ width: `${trainingLoadScore}%`, background: 'linear-gradient(90deg,#2ECC8B,#F5A623)' }}
-                      />
-                    </div>
-                    <span className="font-sans text-[12px] font-semibold text-[#2ECC8B]">
-                      {trainingLoadScore >= 60 ? '▲ Trending up' : '— Building volume'}
-                    </span>
-                  </Card>
-                </div>
-              </div>
+              <MetricCardsRow
+                weeklyMileage={weeklyMileage}
+                weeklyTarget={weeklyTarget}
+                unitLabel={unitLabel}
+                weeklyMilageDelta={weeklyMilageDelta}
+                aerobicEffImprovement={aerobicEffImprovement}
+                aerobicEffData={aerobicEffData}
+                trainingLoadScore={trainingLoadScore}
+                trainingLoadLabel={trainingLoadLabel}
+                weeklyRunCount={weeklyRunCount}
+              />
 
               {/* ④ TRAINING TRENDS */}
-              <div>
-                <SLabel>Training Trends</SLabel>
-                <div className="grid grid-cols-2 gap-5">
-                  {/* Weekly Mileage chart */}
-                  <Card>
-                    <div className="font-sans text-[10px] font-bold text-[var(--color-text-muted)] uppercase tracking-[0.1em] mb-[2px]">
-                      Weekly Mileage
-                    </div>
-                    <div className="font-sans text-[12px] text-[var(--color-text-muted)] mb-5">8-week history</div>
-                    {weeklyChartData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height={160}>
-                        <BarChart data={weeklyChartData} barSize={20} barCategoryGap="20%">
-                          <XAxis dataKey="week" tick={chartTheme.axis.tick} axisLine={false} tickLine={false} tickMargin={8} />
-                          <YAxis hide />
-                          <Tooltip content={({ active, payload, label }) => <Tip active={active} payload={payload} label={label} unit={` ${unitLabel}`} />} cursor={{ fill: 'rgba(27,37,89,0.02)' }} />
-                          <Bar dataKey="miles" radius={[4, 4, 0, 0]}>
-                            {weeklyChartData.map((_, idx) => (
-                              <Cell key={idx} fill={idx === weeklyChartData.length - 1 ? '#E8634A' : '#1B2559'} fillOpacity={idx === weeklyChartData.length - 1 ? 1 : 0.4} />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="h-[160px] flex items-center justify-center font-sans text-[13px] text-[var(--color-text-muted)]">
-                        No data — sync your activities
-                      </div>
-                    )}
-                  </Card>
-
-                  {/* Effort Distribution */}
-                  <Card>
-                    <div className="font-sans text-[10px] font-bold text-[var(--color-text-muted)] uppercase tracking-[0.1em] mb-[2px]">
-                      Effort Distribution
-                    </div>
-                    <div className="font-sans text-[12px] text-[var(--color-text-muted)] mb-5">
-                      Time in zone this week ·{' '}
-                      {effortDist.reduce((s, z) => s + z.mins, 0) > 0
-                        ? `${Math.round(effortDist.reduce((s, z) => s + z.mins, 0))} min total`
-                        : 'No data yet'}
-                    </div>
-                    {effortDist.map((z, i) => {
-                      const onTarget = z.pct >= 10;
-                      return (
-                        <div key={i} className={i < effortDist.length - 1 ? 'mb-[14px]' : ''}>
-                          <div className="flex justify-between items-center mb-[6px]">
-                            <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 rounded-full shrink-0" style={{ background: z.color }} />
-                              <span className="font-sans text-[13px] font-semibold text-[var(--color-text-secondary)]">{z.zone}</span>
-                              <span className="font-sans text-[11px] text-[var(--color-text-muted)]">{z.label}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {z.mins > 0 && <span className="font-sans text-[11px] text-[var(--color-text-muted)]">{Math.round(z.mins)}m</span>}
-                              <span className="font-mono text-[13px] font-bold text-navy">{z.pct}%</span>
-                              {onTarget && <LuCheck size={12} className="text-[var(--color-success)]" />}
-                            </div>
-                          </div>
-                          <div className="h-[6px] bg-[var(--color-border-light)] rounded-full overflow-hidden">
-                            <div className="h-full rounded-full" style={{ width: `${z.pct}%`, background: z.color }} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {effortDist.length > 0 && effortDist[0].pct + effortDist[1].pct > 0 && (
-                      <div className="mt-4 px-3 py-[10px] bg-[var(--color-bg-elevated)] rounded-lg">
-                        <span className="font-sans text-[12px] text-[var(--color-text-secondary)]">
-                          💡 Z1+Z2 = <span className="font-bold text-[#2ECC8B]">{effortDist[0].pct + effortDist[1].pct}%</span>
-                          {effortDist[0].pct + effortDist[1].pct >= 70 ? ' — precise aerobic base building' : ' — aim for 70%+ in Z1–Z2'}
-                        </span>
-                      </div>
-                    )}
-                  </Card>
-                </div>
-              </div>
+              <TrainingTrendsCharts weeklyChartData={weeklyChartData} unitLabel={unitLabel} effortDist={effortDist} />
 
               {/* ⑤ RECENT RUNS */}
-              <div>
-                <SLabel action={<span className="font-sans text-[11px] text-[var(--color-text-muted)]">via Strava</span>}>
-                  Recent Runs
-                </SLabel>
-                {recentRuns.length > 0 ? (
-                  <Card style={{ padding: 0 }}>
-                    <div
-                      className="grid gap-4 px-6 py-3 border-b border-[var(--color-border-light)]"
-                      style={{ gridTemplateColumns: RUN_TABLE_COLS }}
-                    >
-                      {RUN_TABLE_HEADERS.map((h, i) => (
-                        <span
-                          key={h}
-                          className="font-sans text-[10px] font-bold text-[var(--color-text-muted)] uppercase tracking-[0.09em]"
-                          style={{ textAlign: i >= 2 ? 'right' : 'left' }}
-                        >{h}</span>
-                      ))}
-                    </div>
-                    {recentRuns.map((r, i) => {
-                      const hr      = r.average_heart_rate;
-                      const hrColor = hr >= 165 ? '#E84A4A' : hr <= 145 ? '#2ECC8B' : '#F5A623';
-                      const distMi  = parseFloat(((r.distance_meters || 0) / MPU).toFixed(1));
-                      const elevFt  = Math.round((r.elevation_gain || 0) * 3.28084);
-                      const runType = r.workout_type || 'Easy';
-                      return (
-                        <div
-                          key={i}
-                          className="krs-rr grid gap-4 px-6 py-4 items-center transition-colors"
-                          style={{
-                            gridTemplateColumns: RUN_TABLE_COLS,
-                            background: 'transparent',
-                            borderBottom: i < recentRuns.length - 1 ? '1px solid #F8F9FC' : 'none',
-                          }}
-                        >
-                          <span className="font-sans text-[13px] font-medium text-[var(--color-text-secondary)]">
-                            {new Date(r.start_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                          </span>
-                          <span><Pill type={runType} /></span>
-                          <span className="font-mono text-[20px] font-bold text-navy text-right">
-                            {distMi}<span className="text-[12px] font-medium text-[var(--color-text-muted)]"> {unitLabel}</span>
-                          </span>
-                          <span className="font-mono text-[14px] text-navy text-right">
-                            {fmtPace(r.average_pace_seconds_per_km)}
-                          </span>
-                          <span className="font-mono text-[13px] text-[var(--color-text-secondary)] text-right">
-                            {r.duration_seconds ? fmtTime(r.duration_seconds) : r.moving_time_seconds ? fmtTime(r.moving_time_seconds) : '—'}
-                          </span>
-                          <span
-                            className="font-mono text-[13px] font-semibold text-right"
-                            style={{ color: hr ? hrColor : '#8B93B0' }}
-                          >
-                            {hr ? <>{hr}<span className="font-sans text-[10px] font-medium text-[var(--color-text-muted)]"> bpm</span></> : '—'}
-                          </span>
-                          <span className="font-mono text-[13px] text-[#4A6CF7] text-right">
-                            {elevFt > 0 ? <>↑{elevFt}<span className="font-sans text-[10px] text-[var(--color-text-muted)]"> ft</span></> : '—'}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </Card>
-                ) : (
-                  <Card>
-                    <div className="text-center py-6 font-sans text-[14px] text-[var(--color-text-muted)]">
-                      No runs yet — sync your Strava activities to see them here
-                    </div>
-                  </Card>
-                )}
-              </div>
+              <RecentRunsTable recentRuns={recentRuns} MPU={MPU} unitLabel={unitLabel} fmtPace={fmtPace} />
 
               {/* ⑥ OPTIONAL WIDGET GRID */}
               <WidgetGrid active={activeWidgets} dashboardData={dashboardData} computedData={widgetData} onRefresh={fetchDashboardData} stravaConnected={stravaConnected} onConnect={handleConnectStrava} />
