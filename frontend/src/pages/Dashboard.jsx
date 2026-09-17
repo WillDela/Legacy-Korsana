@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { LuCheck } from 'react-icons/lu';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import {
   BarChart, Bar, LineChart, Line,
   XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
@@ -22,15 +22,18 @@ import { coachAPI } from '../api/coach';
 import { chartTheme } from '../lib/chartTheme';
 import { getStravaRedirectState, clearStravaRedirectParams } from '../lib/stravaRedirect';
 import { useStravaSync } from '../hooks/useStravaSync';
-import { WC, PHASE_VARIANT, DAY_LABELS, RUN_TABLE_COLS, RUN_TABLE_HEADERS } from '../lib/dashboardConstants';
-import { fmtDateISO, fmtTime, getTrainingPhase, getWorkoutSegments } from '../lib/dashboardHelpers';
+import { PHASE_VARIANT, DAY_LABELS, RUN_TABLE_COLS, RUN_TABLE_HEADERS } from '../lib/dashboardConstants';
+import { fmtDateISO, fmtTime, getTrainingPhase } from '../lib/dashboardHelpers';
 import Pill from '../components/dashboard/atoms/Pill';
 import Card from '../components/dashboard/atoms/Card';
 import SLabel from '../components/dashboard/atoms/SLabel';
 import Tip from '../components/dashboard/atoms/Tip';
-import Gauge from '../components/dashboard/atoms/Gauge';
 import WidgetSelector from '../components/dashboard/WidgetSelector';
 import WidgetGrid from '../components/dashboard/WidgetGrid';
+import WeekCalendarStrip from '../components/dashboard/sections/WeekCalendarStrip';
+import TodayWorkoutCard from '../components/dashboard/sections/TodayWorkoutCard';
+import RaceReadinessCard from '../components/dashboard/sections/RaceReadinessCard';
+import UpNextCard from '../components/dashboard/sections/UpNextCard';
 
 // ─── Dashboard ────────────────────────────────────────────────
 const Dashboard = () => {
@@ -48,7 +51,6 @@ const Dashboard = () => {
   const [stravaConnected, setStravaConnected] = useState(null);
   const [insight, setInsight] = useState(null);
 
-  const [showFactors, setShowFactors] = useState(false);
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [activeWidgets, setActiveWidgets] = useState(() => {
     try {
@@ -129,6 +131,11 @@ const Dashboard = () => {
 
   const handleSavePlan = useCallback(async (data) => {
     await calendarAPI.createEntry(data);
+    fetchWeekEntries();
+  }, [fetchWeekEntries]);
+
+  const handleMarkDone = useCallback(async (entryId) => {
+    await calendarAPI.updateStatus(entryId, 'completed');
     fetchWeekEntries();
   }, [fetchWeekEntries]);
 
@@ -674,240 +681,28 @@ const Dashboard = () => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
 
           {/* ① WEEK CALENDAR STRIP */}
-              <div>
-                <SLabel action={
-                  <Link to="/calendar" className="font-sans text-[12px] font-semibold text-coral no-underline cursor-pointer">
-                    Full Calendar →
-                  </Link>
-                }>This Week's Plan</SLabel>
-                <Card style={{ padding: 0, overflow: 'hidden' }}>
-                  <div className="grid grid-cols-7">
-                    {calendarStrip.map((d, i) => {
-                      const s = WC[d.type] || WC.Easy;
-                      const isT = d.today;
-                      return (
-                        <div
-                          key={i}
-                          className={`py-[18px] px-2 pb-4 text-center relative cursor-default transition-colors ${i < 6 ? 'border-r border-[var(--color-border-light)]' : ''} ${isT ? 'bg-navy' : 'krs-cal'}`}
-                        >
-                          <div className={`font-sans text-[9px] font-bold uppercase tracking-[0.07em] mb-[5px] ${isT ? 'text-white/40' : 'text-[var(--color-text-muted)]'}`}>
-                            {d.day}
-                          </div>
-                          <div className={`font-mono text-[28px] font-bold leading-none mb-[10px] ${isT ? 'text-white' : 'text-navy'}`}>
-                            {d.date}
-                          </div>
-                          <div className="mb-2">
-                            {d.type ? (
-                              <span
-                                className="rounded-[5px] px-[7px] py-[3px] text-[9px] font-sans font-bold uppercase tracking-[0.05em]"
-                                style={isT
-                                  ? { background: 'rgba(255,255,255,0.12)', color: '#ffffff' }
-                                  : { background: s.bg, color: s.text }}
-                              >
-                                {d.type === 'cross_train' ? (d.title || 'Cross Train') : d.type}
-                              </span>
-                            ) : (
-                              <span className={`font-sans text-[11px] ${isT ? 'text-white/20' : 'text-[#D4D8E8]'}`}>Rest</span>
-                            )}
-                          </div>
-                          {d.miles ? (
-                            <div className={`font-mono text-[16px] font-semibold ${isT ? 'text-coral' : 'text-navy'}`}>
-                              {d.miles}<span className={`font-sans text-[10px] ${isT ? 'text-white/30' : 'text-[var(--color-text-muted)]'}`}> {unitLabel}</span>
-                            </div>
-                          ) : (
-                            <div className={`font-sans text-[12px] ${isT ? 'text-white/20' : 'text-[#D4D8E8]'}`}>
-                              {d.type ? '—' : 'Rest'}
-                            </div>
-                          )}
-                          {d.count > 1 && (
-                            <div className={`font-sans text-[9px] font-bold mt-1 ${isT ? 'text-white/50' : 'text-[var(--color-text-muted)]'}`}>
-                              +{d.count - 1} more
-                            </div>
-                          )}
-                          {d.done && <div className="absolute top-[10px] right-[10px] w-[7px] h-[7px] rounded-full bg-[#2ECC8B]" />}
-                          {isT && <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-5 h-[2px] bg-coral rounded-full" />}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </Card>
-              </div>
+              <WeekCalendarStrip calendarStrip={calendarStrip} unitLabel={unitLabel} />
 
               {/* ② TODAY'S WORKOUT */}
-              <div>
-                <SLabel>Today's Workout</SLabel>
-                {todayEntries.length > 0 ? (
-                  <div className="flex flex-col gap-4">
-                    {todayEntries.map(entry => {
-                      const entryDist = entry.distance_km
-                        ? parseFloat((entry.distance_km * 1000 / MPU).toFixed(1))
-                        : null;
-                      const entryType  = entry.workout_type || null;
-                      const isCrossTrain = entryType === 'cross_train';
-                      const entryHeading = entryType === 'Rest' || entryType === 'rest' ? 'Rest Day'
-                        : isCrossTrain ? (entry.title || 'Cross Training')
-                        : entryDist ? `${entryDist} ${unitLabel} ${entryType}`
-                        : (entry.title || entryType || 'Workout');
-                      const showSubtitle = !isCrossTrain && entry.title && entryHeading !== entry.title;
-                      const segments = entryType ? getWorkoutSegments(entryType, entryDist, unit) : null;
-                      return (
-                        <div key={entry.id} className="bg-navy rounded-2xl overflow-hidden relative shadow-[0_6px_24px_rgba(27,37,89,0.15)]">
-                          <div className="absolute left-0 top-0 bottom-0 w-[6px] bg-coral" />
-                          <div className="absolute right-[-20px] top-[-20px] opacity-5 pointer-events-none">
-                            <svg width="200" height="200" viewBox="0 0 100 100">
-                              <circle cx="50" cy="50" r="40" fill="none" stroke="#fff" strokeWidth="20" />
-                            </svg>
-                          </div>
-                          <div className="p-6 pl-[30px] relative z-[1]">
-                            <div className={`flex justify-between items-start ${segments ? 'mb-5' : ''}`}>
-                              <div>
-                                <div className="flex items-center gap-[10px] mb-2">
-                                  <span className="font-sans text-[13px] font-bold text-white/60 uppercase tracking-[0.1em]">
-                                    {new Date().toLocaleDateString('en-US', { weekday: 'long' })}
-                                  </span>
-                                  {entry.status === 'completed' && (
-                                    <span className="bg-[rgba(46,204,139,0.15)] text-[#2ECC8B] rounded-[5px] px-2 py-[3px] text-[10px] font-sans font-bold uppercase tracking-[0.05em]">
-                                      Done
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="font-heading text-[26px] font-bold text-white leading-[1.1]">
-                                  {entryHeading}
-                                </div>
-                                {showSubtitle && (
-                                  <div className="font-sans text-[14px] text-white/70 leading-relaxed mt-[10px]">
-                                    {entry.title}
-                                  </div>
-                                )}
-                              </div>
-                              {entry.status !== 'completed' && (
-                                <div className="flex flex-col gap-2 items-end">
-                                  <button
-                                    onClick={() => calendarAPI.updateStatus(entry.id, 'completed').then(fetchWeekEntries)}
-                                    className="bg-[#2ECC8B] text-white border-0 rounded-lg px-4 py-2 font-sans text-[13px] font-semibold cursor-pointer flex items-center gap-[6px]"
-                                  >
-                                    <LuCheck size={14} /> Mark Done
-                                  </button>
-                                  <button
-                                    onClick={handlePlanWorkout}
-                                    className="bg-white/10 text-white border border-white/20 rounded-lg px-4 py-2 font-sans text-[13px] font-semibold cursor-pointer"
-                                  >
-                                    Plan Activity
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                            {segments && segments.length > 0 && (
-                              <div className="bg-white/[0.06] rounded-xl p-4 border border-white/[0.08]">
-                                <div className="font-sans text-[11px] font-bold text-white/40 uppercase tracking-[0.05em] mb-3">
-                                  Workout Structure
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                  {segments.map((seg, i) => (
-                                    <div key={i} className="flex items-center gap-3">
-                                      <div
-                                        className="w-2 h-2 rounded-full"
-                                        style={{ background: seg.name === 'Warm-up' || seg.name === 'Cool-down' ? 'rgba(255,255,255,0.2)' : '#E8634A' }}
-                                      />
-                                      <div className="font-mono text-[14px] font-bold text-white w-[60px]">{seg.name}</div>
-                                      <div className="font-sans text-[13px] text-white/70">{seg.detail}</div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="bg-white/50 rounded-2xl border border-dashed border-[#D4D8E8] h-[140px] flex items-center justify-center">
-                    <div className="font-sans text-[14px] text-[var(--color-text-muted)]">No workout scheduled for today</div>
-                  </div>
-                )}
-              </div>
+              <TodayWorkoutCard
+                todayEntries={todayEntries}
+                unit={unit}
+                unitLabel={unitLabel}
+                MPU={MPU}
+                onMarkDone={handleMarkDone}
+                onPlanWorkout={handlePlanWorkout}
+              />
 
               {/* Race Readiness */}
-              <div>
-                <Card>
-                  <SLabel>Race Readiness</SLabel>
-                  <div className="flex items-center gap-4 mb-4">
-                    <Gauge score={readinessScore} />
-                    <div>
-                      <div
-                        className="font-heading text-[22px] font-bold mb-1 tracking-[-0.01em] leading-[1.1]"
-                        style={{ color: readinessColor }}
-                      >{readinessLabel}</div>
-                      <p className="font-sans text-[13px] text-[var(--color-text-secondary)] leading-relaxed">
-                        {readinessScore >= 70
-                          ? 'Strong base. Stay consistent and taper well.'
-                          : readinessScore >= 50
-                            ? 'Good progress. Keep building your long run and weekly volume.'
-                            : 'Focus on consistency and gradual mileage increases.'}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setShowFactors(!showFactors)}
-                    className="w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border-light)] rounded-[10px] py-[10px] font-sans text-[12px] font-bold text-[var(--color-text-secondary)] cursor-pointer flex items-center justify-center gap-[6px]"
-                  >
-                    {showFactors ? 'Hide' : 'Show'} breakdown
-                    <span
-                      className="inline-block transition-transform duration-300"
-                      style={{ transform: showFactors ? 'rotate(180deg)' : 'none' }}
-                    >▾</span>
-                  </button>
-                  {showFactors && (
-                    <div className="mt-[14px] flex flex-col gap-[10px]">
-                      {Object.entries(readinessFactors).filter(([k]) => k !== 'composite').map(([name, score]) => (
-                        <div key={name}>
-                          <div className="flex justify-between mb-[5px]">
-                            <span className="font-sans text-[12px] font-semibold text-[var(--color-text-secondary)]">{name}</span>
-                            <span
-                              className="font-mono text-[13px] font-bold"
-                              style={{ color: score >= 70 ? '#2ECC8B' : score >= 50 ? '#F5A623' : '#E84A4A' }}
-                            >{score}</span>
-                          </div>
-                          <div className="h-[6px] bg-[var(--color-border-light)] rounded-full overflow-hidden">
-                            <div
-                              className="h-full rounded-full"
-                              style={{
-                                width: `${score}%`,
-                                background: score >= 70 ? '#2ECC8B' : score >= 50 ? '#F5A623' : '#E84A4A',
-                              }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </Card>
-              </div>
+              <RaceReadinessCard
+                score={readinessScore}
+                label={readinessLabel}
+                color={readinessColor}
+                factors={readinessFactors}
+              />
 
               {/* Up Next */}
-              {upNextEntries.length > 0 && (
-                <Card>
-                  <SLabel>Up Next</SLabel>
-                  {upNextEntries.map((d, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center gap-[14px] py-3"
-                      style={{ borderBottom: i < upNextEntries.length - 1 ? '1px solid var(--color-border-light)' : 'none' }}
-                    >
-                      <div className="w-11 h-11 rounded-xl bg-[var(--color-bg-elevated)] flex flex-col items-center justify-center shrink-0">
-                        <span className="font-sans text-[9px] text-[var(--color-text-muted)] uppercase font-bold leading-none mb-[2px]">{d.day}</span>
-                        <span className="font-mono text-[18px] font-bold text-navy leading-none">{d.date}</span>
-                      </div>
-                      <div>
-                        {d.type && <Pill type={d.type} sm />}
-                        {d.miles && <div className="font-sans text-[12px] font-semibold text-[var(--color-text-secondary)] mt-1">{d.miles} {unitLabel}</div>}
-                        {!d.miles && d.title && <div className="font-sans text-[12px] font-semibold text-[var(--color-text-secondary)] mt-1">{d.title}</div>}
-                      </div>
-                    </div>
-                  ))}
-                </Card>
-              )}
+              <UpNextCard entries={upNextEntries} unitLabel={unitLabel} />
 
               {/* ③ METRIC CARDS */}
               <div>
