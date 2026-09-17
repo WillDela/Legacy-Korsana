@@ -1,21 +1,18 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { goalsAPI } from '../api/goals';
 import { useUnits } from '../context/UnitsContext';
 import { formatPace, distanceLabel } from '../utils/units';
 import { stravaAPI } from '../api/strava';
-import { activitiesAPI } from '../api/activities';
 import { calendarAPI } from '../api/calendar';
 import { userProfileAPI } from '../api/userProfile';
 import { getErrorMessage } from '../api/client';
 import SessionDetailsModal from '../components/SessionDetailsModal';
-import { dashboardAPI } from '../api/dashboard';
 import AppPageHero from '../components/ui/AppPageHero';
 import MetricStrip from '../components/ui/MetricStrip';
 import BriefingPanel from '../components/ui/BriefingPanel';
-import { coachAPI } from '../api/coach';
 import { getStravaRedirectState, clearStravaRedirectParams } from '../lib/stravaRedirect';
 import { useStravaSync } from '../hooks/useStravaSync';
+import { useDashboardData } from '../hooks/useDashboardData';
 import { PHASE_VARIANT, DAY_LABELS } from '../lib/dashboardConstants';
 import { fmtDateISO, getTrainingPhase } from '../lib/dashboardHelpers';
 import WidgetSelector from '../components/dashboard/WidgetSelector';
@@ -38,11 +35,11 @@ const Dashboard = () => {
   const fmtPace = (secPerKm) => formatPace(secPerKm, unit);
   const unitLabel = distanceLabel(unit);
 
-  const [activeGoal, setActiveGoal] = useState(null);
-  const [activities, setActivities] = useState([]);
-  const [weekEntries, setWeekEntries] = useState([]);
+  const {
+    activeGoal, activities, weekEntries, insight, dashboardData,
+    fetchActivities, fetchDashboardData, fetchWeekEntries,
+  } = useDashboardData();
   const [stravaConnected, setStravaConnected] = useState(null);
-  const [insight, setInsight] = useState(null);
 
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [activeWidgets, setActiveWidgets] = useState(() => {
@@ -57,68 +54,6 @@ const Dashboard = () => {
   const toggleWidget = useCallback((id) => setActiveWidgets(prev =>
     prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
   ), []);
-
-  const [dashboardData, setDashboardData] = useState(null);
-
-  const fetchActiveGoal = useCallback(async () => {
-    try {
-      const res = await goalsAPI.getActiveGoal();
-      setActiveGoal(res.goal);
-    } catch { /* no active goal */ }
-  }, []);
-
-  const fetchActivities = useCallback(async () => {
-    try {
-      const res = await activitiesAPI.getActivities();
-      const acts = res.activities || [];
-      setActivities(acts);
-      return acts;
-    } catch {
-      setActivities([]);
-      return [];
-    }
-  }, []);
-
-  const fetchDashboardData = useCallback(async () => {
-    try {
-      const data = await dashboardAPI.get();
-      setDashboardData(data);
-    } catch { /* dashboard data unavailable */ }
-  }, []);
-
-  const fetchInsight = useCallback(async () => {
-    const CACHE_KEY = 'korsana_insight';
-    try {
-      const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
-      const today = new Date().toDateString();
-      if (cached?.date === today && cached?.text) {
-        setInsight(cached.text);
-        return;
-      }
-    } catch { /* ignore bad cache */ }
-
-    try {
-      const data = await coachAPI.getInsight();
-      const text = data?.insight || null;
-      setInsight(text);
-      if (text) {
-        localStorage.setItem(CACHE_KEY, JSON.stringify({ text, date: new Date().toDateString() }));
-      }
-    } catch { /* insight is non-critical, fail silently */ }
-  }, []);
-
-  const fetchWeekEntries = useCallback(async () => {
-    try {
-      const today = new Date();
-      const monday = new Date(today);
-      const day = today.getDay();
-      monday.setDate(today.getDate() - (day === 0 ? 6 : day - 1));
-      monday.setHours(0, 0, 0, 0);
-      const res = await calendarAPI.getWeek(fmtDateISO(monday));
-      const entries = (res.entries || []).map(e => ({ ...e, date: e.date.slice(0, 10) }));
-      setWeekEntries(entries);
-    } catch { setWeekEntries([]); }
-  }, []);
 
   const handlePlanWorkout = () => setShowPlanModal(true);
 
@@ -181,15 +116,17 @@ const Dashboard = () => {
     showSyncMessage(redirectState.text, 'error', 5000);
   }, [searchParams, setSearchParams, showSyncMessage, syncStravaActivities]);
 
+  // useDashboardData fetches activeGoal/weekEntries/dashboardData/insight on
+  // its own mount. Activities are fetched here instead, since whether to
+  // trigger a Strava auto-sync depends on the result, and syncStravaActivities
+  // (from useStravaSync above) already uses this hook's fetchActivities and
+  // fetchDashboardData as its onSuccess callbacks.
   useEffect(() => {
-    fetchActiveGoal();
     (async () => {
       const acts = await fetchActivities();
       if (!acts.length) syncStravaActivities();
     })();
-    fetchWeekEntries();
-    fetchDashboardData();
-    fetchInsight();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only, matches prior behavior
   }, []);
 
   const today = new Date();
