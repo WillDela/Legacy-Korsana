@@ -1,9 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, memo } from 'react';
-import {
-  LuChartColumnBig as LuBarChart2, LuTarget, LuActivity, LuHeart, LuZap, LuHeartPulse,
-  LuMountain, LuFootprints, LuFlame, LuDumbbell, LuCircleCheckBig as LuCheckCircle2,
-  LuTrendingUp, LuCheck,
-} from 'react-icons/lu';
+import { LuCheck } from 'react-icons/lu';
 import { useSearchParams, Link } from 'react-router-dom';
 import {
   BarChart, Bar, LineChart, Line,
@@ -41,110 +37,8 @@ import { coachAPI } from '../api/coach';
 import { chartTheme } from '../lib/chartTheme';
 import { getStravaRedirectState, clearStravaRedirectParams } from '../lib/stravaRedirect';
 import { useStravaSync } from '../hooks/useStravaSync';
-
-// ─── Workout type colors ───────────────────────────────────────
-const WC = {
-  easy:          { bg: '#E8F0FE', text: '#2A3A7C' },
-  Easy:          { bg: '#E8F0FE', text: '#2A3A7C' },
-  long:          { bg: '#1B2559', text: '#FFFFFF' },
-  'Long Run':    { bg: '#1B2559', text: '#FFFFFF' },
-  Long:          { bg: '#1B2559', text: '#FFFFFF' },
-  tempo:         { bg: '#FDE8E3', text: '#C0391B' },
-  Tempo:         { bg: '#FDE8E3', text: '#C0391B' },
-  interval:      { bg: '#FFF3CD', text: '#856404' },
-  Intervals:     { bg: '#FFF3CD', text: '#856404' },
-  rest:          { bg: '#ECEEF4', text: '#8B93B0' },
-  Rest:          { bg: '#ECEEF4', text: '#8B93B0' },
-  cross_train:   { bg: '#F1F5F9', text: '#475569' },
-  'Cross Train': { bg: '#F1F5F9', text: '#475569' },
-  cycling:       { bg: '#E0F2FE', text: '#0369A1' },
-  swimming:      { bg: '#CFFAFE', text: '#0E7490' },
-  lifting:       { bg: '#EDE9FE', text: '#6D28D9' },
-  walking:       { bg: '#DCFCE7', text: '#15803D' },
-  recovery:      { bg: '#F1F5F9', text: '#475569' },
-  Recovery:      { bg: '#F1F5F9', text: '#475569' },
-};
-
-// ─── Training phase config ─────────────────────────────────────
-const PHASE_VARIANT = { Build: 'info', Peak: 'coral', Taper: 'success', 'Race Week': 'warning' };
-
-const WIDGETS = [
-  { id: 'load',          label: 'Training Load',  Icon: LuBarChart2 },
-  { id: 'predictor',     label: 'Race Predictor', Icon: LuTarget },
-  { id: 'longrun',       label: 'Long Run',       Icon: LuActivity },
-  { id: 'recovery',      label: 'Recovery',       Icon: LuHeart },
-  { id: 'injuryrisk',    label: 'Injury Risk',    Icon: LuZap },
-  { id: 'hrzones',       label: 'HR Zones',       Icon: LuHeartPulse },
-  { id: 'elevation',     label: 'Elevation',      Icon: LuMountain },
-  { id: 'cadence',       label: 'Cadence',        Icon: LuFootprints },
-  { id: 'streak',        label: 'Streak',         Icon: LuFlame },
-  { id: 'crosstraining', label: 'Cross-Training', Icon: LuDumbbell },
-  { id: 'execution',     label: 'Exec Score',     Icon: LuCheckCircle2 },
-  { id: 'shoes',         label: 'Shoes',          Icon: LuFootprints },
-  { id: 'cardiac',       label: 'Cardiac Drift',  Icon: LuTrendingUp },
-  { id: 'calories',      label: 'Calories',       Icon: LuFlame },
-];
-
-const DAY_LABELS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-
-const RUN_TABLE_COLS = '100px 100px 2fr 1fr 1fr 1fr 1fr';
-const RUN_TABLE_HEADERS = ['Date', 'Type', 'Distance', 'Pace', 'Time', 'HR', 'Elev'];
-
-// ─── Helpers ──────────────────────────────────────────────────
-const fmtDateISO = (d) => {
-  const dt = new Date(d);
-  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-};
-
-// fmtPace is now defined inside the component so it closes over `unit`.
-
-const fmtTime = (secs) => {
-  if (!secs) return '--:--:--';
-  const h = Math.floor(secs / 3600);
-  const m = Math.floor((secs % 3600) / 60);
-  const s = secs % 60;
-  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  return `${m}:${String(s).padStart(2, '0')}`;
-};
-
-const getTrainingPhase = (weeksOut) => {
-  if (weeksOut < 2) return 'Race Week';
-  if (weeksOut < 8) return 'Taper';
-  if (weeksOut < 12) return 'Peak';
-  return 'Build';
-};
-
-const getWorkoutSegments = (type, dist, u) => {
-  const m = dist || 0;
-  const ul = u === 'imperial' ? 'mi' : 'km';
-  switch (type) {
-    case 'Long Run':
-    case 'Long':
-      return [
-        { name: 'Warm-up',  detail: `2 ${ul} easy · HR ramp to Z2` },
-        { name: 'Main Set', detail: `${Math.max(1, m - 4)} ${ul} @ Z2 · feel conversational` },
-        { name: 'Cool-down', detail: `2 ${ul} easy walk/jog` },
-      ];
-    case 'Tempo':
-      return [
-        { name: 'Warm-up',  detail: `1 ${ul} easy` },
-        { name: 'Main Set', detail: `${Math.max(1, m - 2)} ${ul} @ Z3–Z4 · comfortably hard` },
-        { name: 'Cool-down', detail: `1 ${ul} easy` },
-      ];
-    case 'Intervals':
-      return [
-        { name: 'Warm-up',  detail: `1 ${ul} easy + strides` },
-        { name: 'Main Set', detail: 'Repeats @ Z4–Z5 · full recovery' },
-        { name: 'Cool-down', detail: `1 ${ul} easy jog` },
-      ];
-    default:
-      return [
-        { name: 'Effort',   detail: 'Z1–Z2 · conversational pace' },
-        { name: 'Duration', detail: `${m > 0 ? `${m} ${ul} target` : 'Easy effort'}` },
-        { name: 'Focus',    detail: 'Keep HR below Z3' },
-      ];
-  }
-};
+import { WC, PHASE_VARIANT, WIDGETS, DAY_LABELS, RUN_TABLE_COLS, RUN_TABLE_HEADERS } from '../lib/dashboardConstants';
+import { fmtDateISO, fmtTime, getTrainingPhase, getWorkoutSegments } from '../lib/dashboardHelpers';
 
 // ─── Atom components ──────────────────────────────────────────
 const Pill = ({ type, sm = false }) => {
