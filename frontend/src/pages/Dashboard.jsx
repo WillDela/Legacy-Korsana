@@ -6,13 +6,12 @@ import {
 } from 'react-icons/lu';
 import { useSearchParams, Link } from 'react-router-dom';
 import {
-  BarChart, Bar, LineChart, Line, AreaChart, Area,
-  XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine,
-  PieChart, Pie, Cell,
+  BarChart, Bar, LineChart, Line,
+  XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts';
 import { goalsAPI } from '../api/goals';
 import { useUnits } from '../context/UnitsContext';
-import { formatDistance, formatPace, distanceLabel } from '../utils/units';
+import { formatPace, distanceLabel } from '../utils/units';
 import { stravaAPI } from '../api/strava';
 import { activitiesAPI } from '../api/activities';
 import { calendarAPI } from '../api/calendar';
@@ -67,13 +66,6 @@ const WC = {
 };
 
 // ─── Training phase config ─────────────────────────────────────
-const PC = {
-  Build:       { accent: '#4A6CF7', label: '#2A3A7C', badge: '#E8F0FE' },
-  Peak:        { accent: '#E8634A', label: '#C0391B', badge: '#FDE8E3' },
-  Taper:       { accent: '#2ECC8B', label: '#1A7A50', badge: '#E9FBF3' },
-  'Race Week': { accent: '#F5A623', label: '#856404', badge: '#FFF3CD' },
-};
-
 const PHASE_VARIANT = { Build: 'info', Peak: 'coral', Taper: 'success', 'Race Week': 'warning' };
 
 const WIDGETS = [
@@ -115,14 +107,6 @@ const fmtTime = (secs) => {
   return `${m}:${String(s).padStart(2, '0')}`;
 };
 
-const fmtTargetTime = (secs) => {
-  if (!secs) return '--:--:--';
-  const h = Math.floor(secs / 3600);
-  const m = Math.floor((secs % 3600) / 60);
-  const s = secs % 60;
-  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-};
-
 const getTrainingPhase = (weeksOut) => {
   if (weeksOut < 2) return 'Race Week';
   if (weeksOut < 8) return 'Taper';
@@ -162,12 +146,6 @@ const getWorkoutSegments = (type, dist, u) => {
   }
 };
 
-const DIST_LABELS = [
-  { label: 'Marathon',      meters: 42195, tolerance: 500 },
-  { label: 'Half Marathon', meters: 21097, tolerance: 300 },
-  { label: '10K',           meters: 10000, tolerance: 200 },
-  { label: '5K',            meters: 5000,  tolerance: 200 },
-];
 // ─── Atom components ──────────────────────────────────────────
 const Pill = ({ type, sm = false }) => {
   const s = WC[type] || WC.Easy;
@@ -180,12 +158,6 @@ const Pill = ({ type, sm = false }) => {
     </span>
   );
 };
-
-const PageContainer = ({ children, className = '', style = {} }) => (
-  <div className={className} style={{ maxWidth: 1060, width: '100%', margin: '0 auto', ...style }}>
-    {children}
-  </div>
-);
 
 const Card = ({ children, style = {} }) => (
   <div className="bg-white rounded-2xl shadow-sm" style={{ padding: '24px', ...style }}>
@@ -447,7 +419,6 @@ const Dashboard = () => {
   // Unit-aware helpers (defined here so they close over `unit`)
   const MPU = unit === 'imperial' ? 1609.34 : 1000;            // meters per unit
   const fmtPace = (secPerKm) => formatPace(secPerKm, unit);
-  const fmtDist = (meters) => formatDistance(meters, unit);
   const unitLabel = distanceLabel(unit);
 
   const [activeGoal, setActiveGoal] = useState(null);
@@ -455,7 +426,6 @@ const Dashboard = () => {
   const [weekEntries, setWeekEntries] = useState([]);
   const [stravaConnected, setStravaConnected] = useState(null);
   const [insight, setInsight] = useState(null);
-  const [requestedIntegrations, setRequestedIntegrations] = useState({});
 
   const [showFactors, setShowFactors] = useState(false);
   const [showPlanModal, setShowPlanModal] = useState(false);
@@ -498,17 +468,6 @@ const Dashboard = () => {
       const data = await dashboardAPI.get();
       setDashboardData(data);
     } catch { /* dashboard data unavailable */ }
-  }, []);
-
-  const fetchIntegrationInterest = useCallback(async () => {
-    try {
-      const data = await userProfileAPI.getFullProfile();
-      setRequestedIntegrations(
-        Object.fromEntries((data?.integration_interest || []).map((item) => [item.source, true])),
-      );
-    } catch {
-      setRequestedIntegrations({});
-    }
   }, []);
 
   const fetchInsight = useCallback(async () => {
@@ -576,7 +535,6 @@ const Dashboard = () => {
       const name = provider[0].toUpperCase() + provider.slice(1);
       try {
         await userProfileAPI.requestIntegrationInterest(provider);
-        setRequestedIntegrations((prev) => ({ ...prev, [provider]: true }));
         showSyncMessage(`We'll keep you posted when ${name} beta access opens.`, 'success', 3500);
       } catch (error) {
         showSyncMessage(getErrorMessage(error), 'error', 4000);
@@ -611,7 +569,6 @@ const Dashboard = () => {
     fetchWeekEntries();
     fetchDashboardData();
     fetchInsight();
-    fetchIntegrationInterest();
   }, []);
 
   const today = new Date();
@@ -621,9 +578,7 @@ const Dashboard = () => {
     ? Math.max(0, Math.ceil((new Date(activeGoal.race_date) - today) / 86400000))
     : null;
   const weeksOut = daysToRace !== null ? Math.floor(daysToRace / 7) : null;
-  const daysRem  = daysToRace !== null ? daysToRace % 7 : null;
   const trainingPhase = weeksOut !== null ? getTrainingPhase(weeksOut) : 'Build';
-  const pc = PC[trainingPhase];
 
   const trainingProgress = useMemo(() => {
     if (!activeGoal?.race_date) return 0;
@@ -633,12 +588,6 @@ const Dashboard = () => {
     const elapsed  = today - created;
     if (total <= 0) return 100;
     return Math.min(100, Math.max(0, Math.round((elapsed / total) * 100)));
-  }, [activeGoal]);
-
-  const targetPaceDisplay = useMemo(() => {
-    if (!activeGoal?.target_time_seconds || !activeGoal?.race_distance_meters) return null;
-    const secPerKm = activeGoal.target_time_seconds / (activeGoal.race_distance_meters / 1000);
-    return fmtPace(secPerKm);
   }, [activeGoal]);
 
   const totalTrainingWeeks = useMemo(() => {
@@ -901,24 +850,6 @@ const Dashboard = () => {
   const todayEntries = useMemo(() =>
     weekEntries.filter(e => e.date === todayISO),
     [weekEntries, todayISO]);
-
-  const todayEntry = useMemo(() =>
-    todayEntries.find(e => e.status === 'planned') || todayEntries[0] || null,
-    [todayEntries]);
-
-  const todayExtraEntries = useMemo(() =>
-    todayEntries.filter(e => e !== todayEntry),
-    [todayEntries, todayEntry]);
-
-  const handleMarkComplete = useCallback(async () => {
-    if (!todayEntry) return;
-    try {
-      await calendarAPI.updateStatus(todayEntry.id, 'completed');
-      fetchWeekEntries();
-    } catch (e) {
-      console.error('Failed to mark workout complete', e);
-    }
-  }, [todayEntry, fetchWeekEntries]);
 
   const calendarStrip = useMemo(() => {
     const result = [];
