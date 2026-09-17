@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, memo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { LuCheck } from 'react-icons/lu';
 import { useSearchParams, Link } from 'react-router-dom';
 import {
@@ -13,23 +13,8 @@ import { activitiesAPI } from '../api/activities';
 import { calendarAPI } from '../api/calendar';
 import { userProfileAPI } from '../api/userProfile';
 import { getErrorMessage } from '../api/client';
-import ErrorBoundary from '../components/ErrorBoundary';
 import SessionDetailsModal from '../components/SessionDetailsModal';
 import { dashboardAPI } from '../api/dashboard';
-import TrainingLoadWidget from '../components/dashboard/widgets/TrainingLoadWidget';
-import RacePredictorWidget from '../components/dashboard/widgets/RacePredictorWidget';
-import LongRunConfidenceWidget from '../components/dashboard/widgets/LongRunConfidenceWidget';
-import RecoveryWidget from '../components/dashboard/widgets/RecoveryWidget';
-import InjuryRiskWidget from '../components/dashboard/widgets/InjuryRiskWidget';
-import HRZonesWidget from '../components/dashboard/widgets/HRZonesWidget';
-import ElevationWidget from '../components/dashboard/widgets/ElevationWidget';
-import CadenceWidget from '../components/dashboard/widgets/CadenceWidget';
-import StreakWidget from '../components/dashboard/widgets/StreakWidget';
-import CrossTrainingWidget from '../components/dashboard/widgets/CrossTrainingWidget';
-import ExecutionScoreWidget from '../components/dashboard/widgets/ExecutionScoreWidget';
-import ShoeWidget from '../components/dashboard/widgets/ShoeWidget';
-import CardiacDriftWidget from '../components/dashboard/widgets/CardiacDriftWidget';
-import CaloriesWidget from '../components/dashboard/widgets/CaloriesWidget';
 import AppPageHero from '../components/ui/AppPageHero';
 import MetricStrip from '../components/ui/MetricStrip';
 import BriefingPanel from '../components/ui/BriefingPanel';
@@ -37,219 +22,15 @@ import { coachAPI } from '../api/coach';
 import { chartTheme } from '../lib/chartTheme';
 import { getStravaRedirectState, clearStravaRedirectParams } from '../lib/stravaRedirect';
 import { useStravaSync } from '../hooks/useStravaSync';
-import { WC, PHASE_VARIANT, WIDGETS, DAY_LABELS, RUN_TABLE_COLS, RUN_TABLE_HEADERS } from '../lib/dashboardConstants';
+import { WC, PHASE_VARIANT, DAY_LABELS, RUN_TABLE_COLS, RUN_TABLE_HEADERS } from '../lib/dashboardConstants';
 import { fmtDateISO, fmtTime, getTrainingPhase, getWorkoutSegments } from '../lib/dashboardHelpers';
 import Pill from '../components/dashboard/atoms/Pill';
 import Card from '../components/dashboard/atoms/Card';
 import SLabel from '../components/dashboard/atoms/SLabel';
 import Tip from '../components/dashboard/atoms/Tip';
 import Gauge from '../components/dashboard/atoms/Gauge';
-
-// ─── WidgetSelector ───────────────────────────────────────────
-const WidgetSelector = ({ active, toggle }) => {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-[6px] border rounded-lg px-3 py-[5px] font-sans text-[11px] font-bold text-navy cursor-pointer transition-all"
-        style={{
-          background: open ? 'rgba(27,37,89,0.08)' : '#F8F9FC',
-          borderColor: open ? '#1B2559' : '#D4D8E8',
-        }}
-      >
-        Customize
-        <span className="font-mono text-[10px] bg-coral text-white rounded-full px-[6px] py-[1px]">
-          {active.length}
-        </span>
-        <span
-          className="text-[11px] text-[var(--color-text-muted)] inline-block transition-transform duration-200"
-          style={{ transform: open ? 'rotate(180deg)' : 'none' }}
-        >▾</span>
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-[299]" onClick={() => setOpen(false)} />
-          <div className="absolute top-[calc(100%+8px)] right-0 bg-white rounded-[14px] w-[320px] border border-[var(--color-border-light)] px-[14px] pt-[14px] pb-[10px] z-[300] shadow-[0_4px_32px_rgba(27,37,89,0.16)]">
-            <div className="font-sans text-[10px] font-bold text-[var(--color-text-muted)] uppercase tracking-[0.1em] mb-[10px]">
-              Customize your widgets
-            </div>
-            <div className="grid grid-cols-3 gap-[6px]">
-              {WIDGETS.map(w => {
-                const on = active.includes(w.id);
-                return (
-                  <button
-                    key={w.id}
-                    onClick={() => toggle(w.id)}
-                    className="rounded-[9px] px-[6px] py-2 flex flex-col items-center gap-[3px] cursor-pointer transition-all border-[1.5px]"
-                    style={{
-                      background: on ? '#1B2559' : '#F8F9FC',
-                      borderColor: on ? '#1B2559' : '#ECEEF4',
-                    }}
-                  >
-                    <w.Icon size={14} />
-                    <span
-                      className="font-sans text-[10px] font-bold"
-                      style={{ color: on ? '#ffffff' : '#4A5173' }}
-                    >{w.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="mt-[10px] pt-[10px] border-t border-[var(--color-border-light)] flex justify-between">
-              <button
-                onClick={() => WIDGETS.forEach(w => !active.includes(w.id) && toggle(w.id))}
-                className="font-sans text-[11px] font-semibold text-navy bg-transparent border-0 cursor-pointer"
-              >Show all</button>
-              <button
-                onClick={() => [...active].forEach(id => toggle(id))}
-                className="font-sans text-[11px] font-semibold text-[var(--color-text-muted)] bg-transparent border-0 cursor-pointer"
-              >Clear</button>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
-
-// ─── WidgetGrid ───────────────────────────────────────────────
-const WidgetGrid = memo(({ active, dashboardData, computedData, onRefresh, stravaConnected, onConnect }) => {
-  if (!active.length) return null;
-  const has = (id) => active.includes(id);
-  const stravaProps = { stravaConnected, onConnect };
-  return (
-    <div className="flex flex-col gap-8">
-
-      {/* ── Readiness ── */}
-      {(has('load') || has('recovery') || has('injuryrisk')) && (
-        <section>
-          <SLabel>Readiness</SLabel>
-          <div className="flex flex-col gap-5">
-            {has('load') && (
-              <ErrorBoundary name="Training Load">
-                <TrainingLoadWidget data={dashboardData?.training_load} {...stravaProps} />
-              </ErrorBoundary>
-            )}
-            {(has('recovery') || has('injuryrisk')) && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                {has('recovery') && (
-                  <ErrorBoundary name="Recovery">
-                    <RecoveryWidget data={dashboardData?.recovery} {...stravaProps} />
-                  </ErrorBoundary>
-                )}
-                {has('injuryrisk') && (
-                  <ErrorBoundary name="Injury Risk">
-                    <InjuryRiskWidget data={dashboardData?.injury_risk} {...stravaProps} />
-                  </ErrorBoundary>
-                )}
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* ── Performance ── */}
-      {(has('predictor') || has('longrun') || has('hrzones')) && (
-        <section>
-          <SLabel>Performance</SLabel>
-          <div className="flex flex-col gap-5">
-            {has('predictor') && (
-              <ErrorBoundary name="Race Predictor">
-                <RacePredictorWidget data={dashboardData?.predictor} onRefresh={onRefresh} {...stravaProps} />
-              </ErrorBoundary>
-            )}
-            {(has('longrun') || has('hrzones')) && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                {has('longrun') && (
-                  <ErrorBoundary name="Long Run">
-                    <LongRunConfidenceWidget data={dashboardData?.long_run} {...stravaProps} />
-                  </ErrorBoundary>
-                )}
-                {has('hrzones') && (
-                  <ErrorBoundary name="HR Zones">
-                    <HRZonesWidget data={dashboardData?.hr_zones} {...stravaProps} />
-                  </ErrorBoundary>
-                )}
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* ── Durability ── */}
-      {(has('elevation') || has('cadence') || has('streak')) && (
-        <section>
-          <SLabel>Durability</SLabel>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {has('elevation') && (
-              <ErrorBoundary name="Elevation">
-                <ElevationWidget data={computedData?.elevation} {...stravaProps} />
-              </ErrorBoundary>
-            )}
-            {has('cadence') && (
-              <ErrorBoundary name="Cadence">
-                <CadenceWidget data={computedData?.cadence} {...stravaProps} />
-              </ErrorBoundary>
-            )}
-            {has('streak') && (
-              <ErrorBoundary name="Streak">
-                <StreakWidget data={computedData?.streak} {...stravaProps} />
-              </ErrorBoundary>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* ── Execution ── */}
-      {(has('execution') || has('calories')) && (
-        <section>
-          <SLabel>Execution</SLabel>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            {has('execution') && (
-              <ErrorBoundary name="Execution Score">
-                <ExecutionScoreWidget data={dashboardData?.execution} />
-              </ErrorBoundary>
-            )}
-            {has('calories') && (
-              <ErrorBoundary name="Calories">
-                <CaloriesWidget data={computedData?.calories} {...stravaProps} />
-              </ErrorBoundary>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* ── Support ── */}
-      {(has('crosstraining') || has('shoes') || has('cardiac')) && (
-        <section>
-          <SLabel>Support</SLabel>
-          <div className="flex flex-col gap-5">
-            {has('crosstraining') && (
-              <ErrorBoundary name="Cross-Training">
-                <CrossTrainingWidget data={dashboardData?.cross_training} onRefresh={onRefresh} />
-              </ErrorBoundary>
-            )}
-            {(has('shoes') || has('cardiac')) && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                {has('shoes') && (
-                  <ErrorBoundary name="Shoes">
-                    <ShoeWidget data={dashboardData?.shoes} onRefresh={onRefresh} />
-                  </ErrorBoundary>
-                )}
-                {has('cardiac') && (
-                  <ErrorBoundary name="Cardiac Drift">
-                    <CardiacDriftWidget />
-                  </ErrorBoundary>
-                )}
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-    </div>
-  );
-});
+import WidgetSelector from '../components/dashboard/WidgetSelector';
+import WidgetGrid from '../components/dashboard/WidgetGrid';
 
 // ─── Dashboard ────────────────────────────────────────────────
 const Dashboard = () => {
