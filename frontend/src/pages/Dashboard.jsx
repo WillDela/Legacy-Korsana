@@ -39,65 +39,11 @@ import { getStravaRedirectState, clearStravaRedirectParams } from '../lib/strava
 import { useStravaSync } from '../hooks/useStravaSync';
 import { WC, PHASE_VARIANT, WIDGETS, DAY_LABELS, RUN_TABLE_COLS, RUN_TABLE_HEADERS } from '../lib/dashboardConstants';
 import { fmtDateISO, fmtTime, getTrainingPhase, getWorkoutSegments } from '../lib/dashboardHelpers';
-
-// ─── Atom components ──────────────────────────────────────────
-const Pill = ({ type, sm = false }) => {
-  const s = WC[type] || WC.Easy;
-  return (
-    <span
-      className={`font-sans font-bold uppercase tracking-[0.05em] whitespace-nowrap rounded-[5px] ${sm ? 'text-[9px] px-[7px] py-[2px]' : 'text-[11px] px-[9px] py-[3px]'}`}
-      style={{ background: s.bg, color: s.text }}
-    >
-      {type}
-    </span>
-  );
-};
-
-const Card = ({ children, style = {} }) => (
-  <div className="bg-white rounded-2xl shadow-sm" style={{ padding: '24px', ...style }}>
-    {children}
-  </div>
-);
-
-const SLabel = ({ children, action }) => (
-  <div className="flex justify-between items-center mb-[14px]">
-    <div className="font-sans text-[10px] font-bold text-[var(--color-text-muted)] uppercase tracking-[0.1em]">
-      {children}
-    </div>
-    {action}
-  </div>
-);
-
-const Tip = ({ active, payload, label, unit = '' }) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-navy rounded-[10px] px-3 py-2">
-      <div className="font-sans text-[10px] text-white/45 mb-[2px]">{label}</div>
-      <div className="font-mono text-[13px] font-bold text-white">{payload[0]?.value}{unit}</div>
-    </div>
-  );
-};
-
-const Gauge = ({ score }) => {
-  const color = score >= 70 ? '#2ECC8B' : score >= 40 ? '#F5A623' : '#E84A4A';
-  const r = 48, circ = 2 * Math.PI * r;
-  return (
-    <div className="relative w-[120px] h-[120px] shrink-0">
-      <svg width="120" height="120" viewBox="0 0 120 120">
-        <circle cx="60" cy="60" r={r} fill="none" stroke="#ECEEF4" strokeWidth="10" />
-        <circle
-          cx="60" cy="60" r={r} fill="none" stroke={color} strokeWidth="10"
-          strokeDasharray={`${(score / 100) * circ} ${circ}`}
-          strokeLinecap="round" transform="rotate(-90 60 60)"
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-mono text-[28px] font-bold text-navy leading-none">{score}</span>
-        <span className="font-sans text-[10px] text-[var(--color-text-muted)]">/ 100</span>
-      </div>
-    </div>
-  );
-};
+import Pill from '../components/dashboard/atoms/Pill';
+import Card from '../components/dashboard/atoms/Card';
+import SLabel from '../components/dashboard/atoms/SLabel';
+import Tip from '../components/dashboard/atoms/Tip';
+import Gauge from '../components/dashboard/atoms/Gauge';
 
 // ─── WidgetSelector ───────────────────────────────────────────
 const WidgetSelector = ({ active, toggle }) => {
