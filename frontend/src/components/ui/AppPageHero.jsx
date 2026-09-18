@@ -47,6 +47,7 @@ export default function AppPageHero({
                   opacity: secondaryAction.disabled ? 0.65 : 1,
                 }}
               >
+                {secondaryAction.icon}
                 {secondaryAction.label}
               </button>
             )}
@@ -60,6 +61,7 @@ export default function AppPageHero({
                   opacity: primaryAction.disabled ? 0.65 : 1,
                 }}
               >
+                {primaryAction.icon}
                 {primaryAction.label}
               </button>
             )}

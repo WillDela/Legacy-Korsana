@@ -1,16 +1,9 @@
 import { useState } from 'react';
 import { predictorAPI } from '../../../api/dashboard';
 import DataEmptyState from '../../ui/DataEmptyState';
+import { fmtTime } from '../../../lib/dashboardHelpers';
 
 const inputClass = 'px-[10px] py-2 rounded-lg border border-[var(--color-border-light)] font-sans text-[12px] box-border';
-
-function fmtTime(secs) {
-  if (!secs) return '--:--:--';
-  const h = Math.floor(secs / 3600);
-  const m = Math.floor((secs % 3600) / 60);
-  const s = Math.round(secs % 60);
-  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
 
 export default function RacePredictorWidget({ data, onRefresh, stravaConnected, onConnect }) {
   const [showModal, setShowModal] = useState(false);

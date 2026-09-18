@@ -1,5 +1,5 @@
 const Gauge = ({ score }) => {
-  const color = score >= 70 ? '#2ECC8B' : score >= 40 ? '#F5A623' : '#E84A4A';
+  const color = score >= 70 ? '#2ECC8B' : score >= 50 ? '#F5A623' : '#E84A4A';
   const r = 48, circ = 2 * Math.PI * r;
   return (
     <div className="relative w-[120px] h-[120px] shrink-0">
